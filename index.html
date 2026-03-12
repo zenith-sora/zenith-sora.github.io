@@ -7,10 +7,385 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="format-detection" content="telephone=no">
+  <title>Zenith Sora</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      overflow: hidden;
+      background: #0a0a0f;
+      font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+    }
+
+    canvas {
+      display: block;
+      position: fixed;
+      top: 0;
+      left: 0;
+      z-index: 1;
+    }
+
+    .overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 2;
+      pointer-events: none;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .title {
+      font-size: 4rem;
+      font-weight: 300;
+      color: rgba(255, 255, 255, 0.9);
+      text-shadow: 0 0 40px rgba(100, 200, 255, 0.5);
+      letter-spacing: 0.3em;
+      margin-bottom: 1rem;
+      animation: fadeIn 2s ease-out;
+    }
+
+    .subtitle {
+      font-size: 1rem;
+      color: rgba(255, 255, 255, 0.5);
+      letter-spacing: 0.5em;
+      animation: fadeIn 2s ease-out 0.5s both;
+    }
+
+    .hint {
+      position: fixed;
+      bottom: 30px;
+      left: 50%;
+      transform: translateX(-50%);
+      color: rgba(255, 255, 255, 0.3);
+      font-size: 0.85rem;
+      letter-spacing: 0.2em;
+      animation: pulse 3s ease-in-out infinite;
+    }
+
+    .nav-btn {
+      position: fixed;
+      top: 30px;
+      right: 30px;
+      z-index: 10;
+      pointer-events: auto;
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      color: rgba(255, 255, 255, 0.8);
+      padding: 12px 24px;
+      font-size: 0.9rem;
+      letter-spacing: 0.15em;
+      cursor: pointer;
+      border-radius: 30px;
+      transition: all 0.3s ease;
+      backdrop-filter: blur(10px);
+      text-decoration: none;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .nav-btn:hover {
+      background: rgba(255, 255, 255, 0.2);
+      border-color: rgba(255, 255, 255, 0.4);
+      transform: translateY(-2px);
+      box-shadow: 0 10px 30px rgba(100, 200, 255, 0.2);
+    }
+
+    .nav-btn svg {
+      width: 16px;
+      height: 16px;
+      fill: currentColor;
+    }
+
+    .color-picker {
+      position: fixed;
+      bottom: 30px;
+      right: 30px;
+      z-index: 10;
+      display: flex;
+      gap: 10px;
+    }
+
+    .color-dot {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      cursor: pointer;
+      border: 2px solid transparent;
+      transition: all 0.3s ease;
+      pointer-events: auto;
+    }
+
+    .color-dot:hover {
+      transform: scale(1.3);
+    }
+
+    .color-dot.active {
+      border-color: white;
+      box-shadow: 0 0 15px currentColor;
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @keyframes pulse {
+      0%, 100% {
+        opacity: 0.3;
+      }
+      50% {
+        opacity: 0.6;
+      }
+    }
+
+    @media (max-width: 768px) {
+      .title {
+        font-size: 2.5rem;
+        letter-spacing: 0.2em;
+      }
+      .subtitle {
+        font-size: 0.8rem;
+      }
+      .nav-btn {
+        top: 20px;
+        right: 20px;
+        padding: 10px 18px;
+        font-size: 0.8rem;
+      }
+    }
+  </style>
 </head>
 
 <body>
-  <H2>hello</H2>
+  <canvas id="canvas"></canvas>
+  
+  <div class="overlay">
+    <h1 class="title">ZENITH SORA</h1>
+    <p class="subtitle">探索 · 思考 · 创造</p>
+  </div>
+
+  <a href="./docs/" class="nav-btn">
+    <svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/></svg>
+    笔记文档
+  </a>
+
+  <p class="hint">移动鼠标 · 点击创造</p>
+
+  <div class="color-picker">
+    <div class="color-dot active" data-theme="aurora" style="background: linear-gradient(135deg, #00d4ff, #7b2ff7);"></div>
+    <div class="color-dot" data-theme="fire" style="background: linear-gradient(135deg, #ff6b35, #f72585);"></div>
+    <div class="color-dot" data-theme="nature" style="background: linear-gradient(135deg, #00f5a0, #00d9f5);"></div>
+    <div class="color-dot" data-theme="gold" style="background: linear-gradient(135deg, #f5af19, #f12711);"></div>
+  </div>
+
+  <script>
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    
+    let width, height;
+    let particles = [];
+    let mouse = { x: null, y: null, radius: 150 };
+    
+    const themes = {
+      aurora: {
+        colors: ['#00d4ff', '#7b2ff7', '#00ff88', '#ff00ff'],
+        bg: '#0a0a0f'
+      },
+      fire: {
+        colors: ['#ff6b35', '#f72585', '#ffbe0b', '#fb5607'],
+        bg: '#0f0a0a'
+      },
+      nature: {
+        colors: ['#00f5a0', '#00d9f5', '#7fff00', '#00fa9a'],
+        bg: '#0a0f0d'
+      },
+      gold: {
+        colors: ['#f5af19', '#f12711', '#ffd700', '#ff8c00'],
+        bg: '#0f0d0a'
+      }
+    };
+    
+    let currentTheme = 'aurora';
+
+    function resize() {
+      width = canvas.width = window.innerWidth;
+      height = canvas.height = window.innerHeight;
+    }
+
+    class Particle {
+      constructor(x, y, isClick = false) {
+        this.x = x ?? Math.random() * width;
+        this.y = y ?? Math.random() * height;
+        this.baseX = this.x;
+        this.baseY = this.y;
+        this.size = Math.random() * 3 + 1;
+        this.baseSize = this.size;
+        this.speedX = (Math.random() - 0.5) * 0.5;
+        this.speedY = (Math.random() - 0.5) * 0.5;
+        this.color = themes[currentTheme].colors[Math.floor(Math.random() * themes[currentTheme].colors.length)];
+        this.life = isClick ? 100 + Math.random() * 50 : Infinity;
+        this.isClick = isClick;
+        if (isClick) {
+          this.speedX = (Math.random() - 0.5) * 8;
+          this.speedY = (Math.random() - 0.5) * 8;
+          this.size = Math.random() * 5 + 2;
+        }
+      }
+
+      update() {
+        if (this.isClick) {
+          this.x += this.speedX;
+          this.y += this.speedY;
+          this.speedX *= 0.98;
+          this.speedY *= 0.98;
+          this.life--;
+          this.size *= 0.99;
+          return;
+        }
+
+        const dx = mouse.x - this.x;
+        const dy = mouse.y - this.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+
+        if (distance < mouse.radius && mouse.x !== null) {
+          const force = (mouse.radius - distance) / mouse.radius;
+          const angle = Math.atan2(dy, dx);
+          this.x -= Math.cos(angle) * force * 5;
+          this.y -= Math.sin(angle) * force * 5;
+          this.size = this.baseSize + force * 3;
+        } else {
+          this.x += (this.baseX - this.x) * 0.05 + this.speedX;
+          this.y += (this.baseY - this.y) * 0.05 + this.speedY;
+          this.size += (this.baseSize - this.size) * 0.1;
+        }
+
+        if (this.x < 0 || this.x > width) this.speedX *= -1;
+        if (this.y < 0 || this.y > height) this.speedY *= -1;
+      }
+
+      draw() {
+        const alpha = this.isClick ? this.life / 150 : 0.8;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+        ctx.fillStyle = this.color;
+        ctx.globalAlpha = alpha;
+        ctx.fill();
+        ctx.globalAlpha = 1;
+      }
+    }
+
+    function init() {
+      particles = [];
+      const numParticles = Math.min((width * height) / 8000, 300);
+      for (let i = 0; i < numParticles; i++) {
+        particles.push(new Particle());
+      }
+    }
+
+    function connect() {
+      for (let i = 0; i < particles.length; i++) {
+        for (let j = i + 1; j < particles.length; j++) {
+          const dx = particles[i].x - particles[j].x;
+          const dy = particles[i].y - particles[j].y;
+          const distance = Math.sqrt(dx * dx + dy * dy);
+
+          if (distance < 120) {
+            const alpha = (1 - distance / 120) * 0.3;
+            ctx.beginPath();
+            ctx.strokeStyle = particles[i].color;
+            ctx.globalAlpha = alpha;
+            ctx.lineWidth = 0.5;
+            ctx.moveTo(particles[i].x, particles[i].y);
+            ctx.lineTo(particles[j].x, particles[j].y);
+            ctx.stroke();
+            ctx.globalAlpha = 1;
+          }
+        }
+      }
+    }
+
+    function animate() {
+      ctx.fillStyle = themes[currentTheme].bg;
+      ctx.fillRect(0, 0, width, height);
+
+      particles = particles.filter(p => !p.isClick || p.life > 0);
+
+      particles.forEach(p => {
+        p.update();
+        p.draw();
+      });
+
+      connect();
+      requestAnimationFrame(animate);
+    }
+
+    canvas.addEventListener('mousemove', (e) => {
+      mouse.x = e.clientX;
+      mouse.y = e.clientY;
+    });
+
+    canvas.addEventListener('mouseleave', () => {
+      mouse.x = null;
+      mouse.y = null;
+    });
+
+    canvas.addEventListener('click', (e) => {
+      for (let i = 0; i < 30; i++) {
+        particles.push(new Particle(e.clientX, e.clientY, true));
+      }
+    });
+
+    canvas.addEventListener('touchmove', (e) => {
+      e.preventDefault();
+      mouse.x = e.touches[0].clientX;
+      mouse.y = e.touches[0].clientY;
+    });
+
+    canvas.addEventListener('touchend', () => {
+      mouse.x = null;
+      mouse.y = null;
+    });
+
+    document.querySelectorAll('.color-dot').forEach(dot => {
+      dot.addEventListener('click', (e) => {
+        e.stopPropagation();
+        document.querySelectorAll('.color-dot').forEach(d => d.classList.remove('active'));
+        dot.classList.add('active');
+        currentTheme = dot.dataset.theme;
+        document.body.style.background = themes[currentTheme].bg;
+        particles.forEach(p => {
+          if (!p.isClick) {
+            p.color = themes[currentTheme].colors[Math.floor(Math.random() * themes[currentTheme].colors.length)];
+          }
+        });
+      });
+    });
+
+    window.addEventListener('resize', () => {
+      resize();
+      init();
+    });
+
+    resize();
+    init();
+    animate();
+  </script>
 </body>
 
 </html>
